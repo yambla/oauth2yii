@@ -1,5 +1,5 @@
 {
-    "name": "yambla/oauth2yii",
+    "name": "codemix/oauth2yii",
     "description": "An OAuth2 client / server extension for the Yii framework",
     "keywords": ["oauth", "oauth2", "authentication"],
     "license": "MIT",
