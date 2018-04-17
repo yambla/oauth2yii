@@ -1,5 +1,5 @@
 {
-    "name": "codemix/oauth2yii",
+    "name": "yambla/oauth2yii",
     "description": "An OAuth2 client / server extension for the Yii framework",
     "keywords": ["oauth", "oauth2", "authentication"],
     "license": "MIT",
@@ -16,6 +16,6 @@
     },
     "require": {
         "php": ">=5.3.0",
-        "bshaffer/oauth2-server-php": "1.0"
+        "bshaffer/oauth2-server-php": "^1.10"
     }
 }
