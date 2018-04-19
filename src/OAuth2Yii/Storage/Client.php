@@ -9,26 +9,14 @@ use \OAuth2\Storage\ClientCredentialsInterface;
  *
  * @author Michael Härtl <haertl.mike@gmail.com>
  */
-class Client extends DbStorage implements ClientInterface, ClientCredentialsInterface
+class Client extends MongoStorage implements ClientInterface, ClientCredentialsInterface
 {
     /**
      * @return string name of the DB table
      */
-    protected function getTableName()
+    protected function getCollectionName()
     {
         return $this->getOAuth2()->clientTable;
-    }
-
-    /**
-     * Create table for this storage
-     */
-    protected function createTable()
-    {
-        $this->getDb()->createCommand()->createTable($this->getTableName(), array(
-            'client_id'     => 'string NOT NULL PRIMARY KEY',
-            'client_secret' => 'string NOT NULL',
-            'redirect_uri'  => 'text NOT NULL',
-        ));
     }
 
     /**
@@ -39,11 +27,17 @@ class Client extends DbStorage implements ClientInterface, ClientCredentialsInte
      */
     public function getClientDetails($client_id)
     {
-        $sql = sprintf(
-            'SELECT client_id,redirect_uri FROM %s WHERE client_id=:id',
-            $this->getTableName()
-        );
-        return $this->getDb()->createCommand($sql)->queryRow(true, array(':id'=>$client_id));
+        return $this->getCollection()->findOne(array('client_id' => $client_id));
+    }
+
+    public function getClientScope($client_id)
+    {
+        return '';
+    }
+
+    public function isPublicClient($client_id)
+    {
+        return false;
     }
 
     /**
@@ -70,12 +64,8 @@ class Client extends DbStorage implements ClientInterface, ClientCredentialsInte
      */
     public function checkClientCredentials($client_id, $client_secret = null)
     {
-        $sql = sprintf(
-            'SELECT client_secret FROM %s WHERE client_id=:id',
-            $this->getTableName()
-        );
-        $hash = $this->getDb()->createCommand($sql)->queryScalar(array(':id'=>$client_id));
+        $storedDetails = $this->getClientDetails($client_id);
 
-        return md5($client_secret) === $hash;
+        return md5($client_secret) === $storedDetails['client_secret'];
     }
 }

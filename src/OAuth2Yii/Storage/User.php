@@ -8,27 +8,14 @@ use \OAuth2\Storage\UserCredentialsInterface;
  *
  * @author Michael Härtl <haertl.mike@gmail.com>
  */
-class User extends DbStorage implements UserCredentialsInterface
+class User extends MongoStorage implements UserCredentialsInterface
 {
     /**
      * @return string name of the DB table
      */
-    protected function getTableName()
+    protected function getCollectionName()
     {
         return $this->getOAuth2()->userTable;
-    }
-
-    /**
-     * Create table for this storage
-     */
-    protected function createTable()
-    {
-        $this->getDb()->createCommand()->createTable($this->getTableName(), array(
-            'username'      => 'string NOT NULL PRIMARY KEY',
-            'password'      => 'string NOT NULL',
-            'first_name'    => 'string',
-            'last_name'     => 'string',
-        ));
     }
 
     /**
@@ -40,13 +27,9 @@ class User extends DbStorage implements UserCredentialsInterface
      */
     public function checkUserCredentials($username, $password)
     {
-        $sql = sprintf(
-            'SELECT password FROM %s WHERE username=:username',
-            $this->getTableName()
-        );
-        $crypted = $this->getDb()->createCommand($sql)->queryScalar(array(':username'=>$username));
+        $storedUser = $this->getUserDetails($username);
 
-        return $crypted === md5($password);
+        return $storedUser['password'] === md5($password);
     }
 
     /**
@@ -57,11 +40,7 @@ class User extends DbStorage implements UserCredentialsInterface
      */
     public function getUserDetails($username)
     {
-        $sql = sprintf(
-            'SELECT username as user_id, scope FROM %s WHERE username=:username',
-            $this->getTableName()
-        );
-        return $this->getDb()->createCommand($sql)->queryRow(true, array(':username'=>$username));
+        return $this->getCollection()->findOne(array('username' => $username));
     }
 
 }

@@ -9,7 +9,7 @@ use \Yii;
  *
  * @author Michael Härtl <haertl.mike@gmail.com>
  */
-class RefreshToken extends DbStorage implements RefreshTokenInterface
+class RefreshToken extends MongoStorage implements RefreshTokenInterface
 {
     // Probability to perform garbage collection (percentage in int)
     const GC_PROBABILITY = 100;
@@ -17,24 +17,9 @@ class RefreshToken extends DbStorage implements RefreshTokenInterface
     /**
      * @return string name of the DB table
      */
-    protected function getTableName()
+    protected function getCollectionName()
     {
         return $this->getOAuth2()->refreshTokenTable;
-    }
-
-    /**
-     * Create table for this storage
-     */
-    protected function createTable()
-    {
-        YII_DEBUG && Yii::trace("Creating refresh token table '{$this->getTableName()}'", 'oauth.storage.refreshtoken');
-        $this->getDb()->createCommand()->createTable($this->getTableName(), array(
-            'refresh_token' => 'string NOT NULL PRIMARY KEY',
-            'client_id'     => 'string NOT NULL',
-            'user_id'       => 'string',
-            'expires'       => 'TIMESTAMP NOT NULL',
-            'scope'         => 'text',
-        ));
     }
 
     /**
@@ -45,13 +30,9 @@ class RefreshToken extends DbStorage implements RefreshTokenInterface
      */
     public function getRefreshToken($token)
     {
-        $sql = sprintf(
-            'SELECT refresh_token,client_id,user_id,expires,scope FROM %s WHERE refresh_token=:token',
-            $this->getTableName()
-        );
-        $result = $this->getDb()->createCommand($sql)->queryRow(true, array(':token'=>$token));
+        $result = $this->getCollection()->findOne(array('refresh_token' => $token));
 
-        if($result===false)
+        if($result===null)
             return null;
 
         YII_DEBUG && Yii::trace(
@@ -87,6 +68,7 @@ class RefreshToken extends DbStorage implements RefreshTokenInterface
         }
 
         $values = array(
+            'refresh_token' => $token,
             'client_id'     => $client_id,
             'user_id'       => $user_id,
             'expires'       => date('Y-m-d H:i:s', $expires),
@@ -104,16 +86,9 @@ class RefreshToken extends DbStorage implements RefreshTokenInterface
             'oauth2.storage.refreshtoken'
         );
 
-        $command = $this->getDb()->createCommand();
+        $result = $this->getCollection()->update(array('refresh_token' => $token), $values, array('upsert' => true));
 
-        if($this->getRefreshToken($token)===null) {
-            $values['refresh_token'] = $token;
-            return (bool)$command->insert($this->getTableName(), $values);
-        } else {
-            return (bool)$command->update($this->getTableName(), $values, 'refresh_token=:token',array(
-                ':token' => $token,
-            ));
-        }
+        return is_array($result) ? (bool)$result['ok'] : $result;
     }
 
 
@@ -125,10 +100,9 @@ class RefreshToken extends DbStorage implements RefreshTokenInterface
      */
     public function unsetRefreshToken($token)
     {
-        YII_DEBUG && Yii::trace("Deleting refresh token '$token'", 'oauth.storage.refreshtoken');
-        return $this->getDb()->createCommand()->delete($this->getTableName(), 'refresh_token=:token', array(
-            ':token' => $token,
-        ));
+        $result = $this->getCollection()->remove(array('refresh_token' => $token));
+
+        return is_array($result) ? (bool)$result['ok'] : $result;
     }
 
     /**
@@ -136,6 +110,8 @@ class RefreshToken extends DbStorage implements RefreshTokenInterface
      */
     protected function removeExpired()
     {
-        $this->getDb()->createCommand()->delete($this->getTableName(), 'expires < NOW()');
+        YII_DEBUG && Yii::trace("Removing expired refresh tokens",'oauth2.storage.refreshtoken');
+        $now = date('Y-m-d H:i:s', new \DateTime());
+        $this->getCollection()->remove(array('expires' => array('$lt' => $now)));
     }
 }
